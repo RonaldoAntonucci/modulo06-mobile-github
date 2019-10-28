@@ -15,21 +15,47 @@ import {
   Info,
   Title,
   Author,
+  Loading,
 } from './styles';
 
 const User = ({ navigation }) => {
   const [stars, setStars] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [refreshing, setRefreshing] = useState(false);
 
   const user = navigation.getParam('user');
 
-  useEffect(() => {
-    async function loadUser() {
-      const response = await api.get(`/users/${user.login}/starred`);
+  async function load() {
+    setLoading(true);
+    const response = await api.get(`/users/${user.login}/starred`, {
+      params: { page },
+    });
 
-      setStars(response.data);
-    }
-    loadUser();
-  }, []);
+    setStars(page >= 2 ? [...stars, ...response.data] : response.data);
+    setLoading(false);
+    setRefreshing(false);
+  }
+
+  useEffect(() => {
+    load();
+  }, [page]);
+
+  async function loadMore() {
+    if (stars.length % 30 === 0) setPage(page + 1);
+  }
+
+  const refreshList = () => {
+    setRefreshing(true);
+    setStars([]);
+    setPage(1);
+    load();
+  };
+
+  const renderFooter = () => {
+    if (!loading) return null;
+    return <Loading />;
+  };
 
   return (
     <Container>
@@ -42,6 +68,11 @@ const User = ({ navigation }) => {
       <Star
         data={stars}
         keyExtractor={star => `${star.id}`}
+        onEndReachedThreshold={0.2}
+        onRefresh={refreshList}
+        refreshing={refreshing}
+        onEndReached={loadMore}
+        ListFooterComponent={renderFooter}
         renderItem={({ item }) => (
           <Starred>
             <OwnerAvatar source={{ uri: item.owner.avatar_url }} />
